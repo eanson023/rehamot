@@ -1,0 +1,13 @@
+name: distilbert_transformer
+_target_: model.textencoder.distilbert_transformer.DistilbertTransformerEncoder
+
+latent_dim: ${model.latent_dim}
+
+ff_size: ${model.ff_size}
+num_layers: ${model.num_layers}
+num_heads: ${model.num_heads}
+dropout: ${model.dropout}
+activation: ${model.activation}
+
+finetune: ${model.finetune}
+modelpath: ${path.deps}/distilbert-base-uncased

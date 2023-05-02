@@ -1,0 +1,11 @@
+name: transformer_encoder
+_target_: model.motionencoder.transformer.TransformerEncoder
+
+latent_dim: ${model.latent_dim}
+embed_size: ${model.embed_size}
+
+ff_size: ${model.ff_size}
+num_layers: ${model.num_layers}
+num_heads: ${model.num_heads}
+dropout: ${model.dropout}
+activation: ${model.activation}

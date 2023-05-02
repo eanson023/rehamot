@@ -1,0 +1,8 @@
+name: lstm_encoder
+_target_: model.motionencoder.rnn.RNNTypeEncoder
+
+latent_dim: ${model.latent_dim}
+embed_size: ${model.embed_size}
+num_layers: ${model.num_layers}
+dropout: ${model.dropout}
+rnn_type: lstm

@@ -1,0 +1,5 @@
+name: contrastive_loss
+_target_: model.losses.ContrastiveLoss
+
+margin: ${model.margin}
+max_violation: ${model.max_violation}

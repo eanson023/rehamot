@@ -1,0 +1,12 @@
+name: distilbert_momentum
+_target_: model.textencoder.distilbert_linear_m.DistilbertLinearMomentumEncoder
+
+latent_dim: ${model.latent_dim}
+dropout: ${model.dropout}
+
+finetune: ${model.finetune}
+modelpath: ${path.deps}/distilbert-base-uncased
+
+momentum: ${model.momentum}
+embed_size: ${model.embed_size}
+queue_size: ${model.queue_size}

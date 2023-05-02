@@ -1,0 +1,5 @@
+name: info_NCE_loss
+_target_: model.losses.InfoNCELoss
+
+temp: ${model.temp}
+queue_size: ${model.queue_size}

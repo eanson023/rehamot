@@ -1,0 +1,21 @@
+dataname: kit-ml
+_target_: model.data.kitml.KITML
+
+# Paths
+datapath: ${path.datasets}/KIT-ML
+splitpath: ${path.datasets}/kitml-splits
+
+# Machine
+batch_size: ${machine.batch_size}
+num_workers: ${machine.num_workers}
+
+# Motion
+framerate: 12.5
+max_duration: 1000
+downsample: false
+
+# Other
+tiny: false
+progress_bar: true
+
+data_augment: ${model.data_augment}

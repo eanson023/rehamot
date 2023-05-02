@@ -1,0 +1,50 @@
+modelname: rehamot
+_target_: model.rehamot.Rehamot
+
+# Dimensionality of the latent embedding.
+latent_dim: 256
+# Dimensionality of the joint embedding.
+embed_size: 1024
+
+# Motion encoder network configuration
+ff_size: 1024
+num_layers: 3
+num_heads: 4
+dropout: 0.1
+activation: "gelu"
+
+# Fine-tune DistilBert
+finetune: false
+
+# Losses
+
+# use MH/MildTriple Loss before epoch [warm_up], If using normal SH Loss, please set warm_up to a number greater than the number of training epochs
+warm_up: 5
+# Rank loss margin.
+margin: 0.2
+# Use max instead of sum in the rank loss. i.e. Adopt hard negative sample mining strategy
+# If warm up is less than the training period, the program will automatically switch to True after warm_up is completed
+max_violation: false
+# MildTriple Loss hyper-parameters, abandon false negatives' threshold
+threshold_hetero: 0.7
+threshold_homo: 0.9
+
+
+defaults:
+  - loss: mild_triplet
+  - motionencoder: transformer
+  - textencoder: distilbert_linear
+
+
+##########################The following are not yet used####################
+
+# Temperature parameter for InfoNCE loss
+temp: 0.07
+
+# Data augmentation
+data_augment: false
+
+# Use momentum encoder
+enable_momentum: false
+momentum: 0.995
+queue_size: 2048

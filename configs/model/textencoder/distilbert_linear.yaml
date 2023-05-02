@@ -1,0 +1,7 @@
+name: distilbert_linear
+_target_: model.textencoder.distilbert_linear.DistilbertLinearEncoder
+
+embed_size: ${model.embed_size}
+
+finetune: ${model.finetune}
+modelpath: ${path.deps}/distilbert-base-uncased

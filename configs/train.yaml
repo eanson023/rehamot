@@ -1,0 +1,30 @@
+hydra:
+  run:
+    dir: outputs/${data.dataname}/${experiment}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  # automatically go to the job folder (needed for hydra > 1.2 with new behavior)
+  job:
+    chdir: true
+
+# Global configurations shared between different modules
+experiment: baseline
+
+seed: 1234
+
+logger_level: INFO
+
+# breakpoint continue, relative path of chekcpoint
+# eg: outputs/kit-ml/ablation/baseline/latest.ckpt
+resume: ''
+
+# Composing nested config with default
+defaults:
+  - data: human-ml-3d
+  - model: rehamot
+  - machine: server
+  - /path@path
+  - _self_
+
+
+
+
+

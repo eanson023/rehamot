@@ -1,0 +1,23 @@
+hydra:
+  run:
+    dir: ${folder}
+  output_subdir: null
+
+seed: 1234
+
+logger_level: INFO
+
+# eg: outputs/kit-ml/ablation/baseline
+folder: ???
+
+split: test
+
+ckpt_name: model_best.ckpt
+last_ckpt_path: ${get_last_checkpoint:${folder},${ckpt_name}}
+
+# Composing nested config with default
+defaults:
+  - data: null
+  - machine: null
+  - /path@path
+  - _self_
