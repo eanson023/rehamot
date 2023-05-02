@@ -59,7 +59,7 @@ cd ..
 ## Pre-trained Models
 
 ### Download models
-Download models [here](http://). Unzip and place them under checkpoint directory, which should be like:
+Download models [here](https://drive.google.com/drive/folders/1soedk60Xx8nuGc1rTtGiVUEiZsj-NNJw?usp=sharing). Unzip and place them under checkpoint directory, which should be like:
 ```bash
 ./checkpoints/HumanML3D
 ./checkpoints/KIT-ML/
