@@ -1,11 +1,11 @@
 <div align="center">
 
-# Cross-Modal Retrieval for 3D Human Motion and Text via MildTriple Loss
+# Cross-Modal Retrieval for Motion and Text via MildTriple Loss
 
 </div>
 
 ## Description
-Official PyTorch implementation of the paper [**"Cross-Modal Retrieval for 3D Human Motion and Text via MildTriple Loss"**](http://???) (Under Review).
+Official PyTorch implementation of the paper [**"Cross-Modal Retrieval for Motion and Text via MildTriple Loss"**](http://???) (Under Review).
 
 ![rehamot](rehamot.jpg)
 
