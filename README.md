@@ -1,11 +1,11 @@
 <div align="center">
 
-# Cross-Modal Retrieval for Motion and Text via MildTriple Loss
+# Cross-Modal Retrieval for Motion and Text via DropTriple Loss
 
 </div>
 
 ## Description
-Official PyTorch implementation of the paper [**"Cross-Modal Retrieval for Motion and Text via MildTriple Loss"**](http://???) (Under Review).
+Official PyTorch implementation of the paper [**"Cross-Modal Retrieval for Motion and Text via DropTriple Loss"**](http://???) (Under Review).
 
 ![rehamot](rehamot.jpg)
 
@@ -70,7 +70,7 @@ To evaluate Rehamot, you must run:
 ```bash
 python evaluate.py folder=FOLDER
 ```
-The ```FOLDER``` can be replaced with specific experiment, such as ```./checkpoints/HumanML3D/mildtripleloss```
+The ```FOLDER``` can be replaced with specific experiment, such as ```./checkpoints/HumanML3D/droptripleloss```
 
 ### View the pre-training results
 We recorded some metrics using tensorboard, which you can view by running the following command:
