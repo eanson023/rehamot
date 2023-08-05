@@ -18,20 +18,20 @@ finetune: false
 
 # Losses
 
-# use MH/MildTriple Loss before epoch [warm_up], If using normal SH Loss, please set warm_up to a number greater than the number of training epochs
+# use MH/DropTriple Loss before epoch [warm_up], If using normal SH Loss, please set warm_up to a number greater than the number of training epochs
 warm_up: 5
 # Rank loss margin.
 margin: 0.2
 # Use max instead of sum in the rank loss. i.e. Adopt hard negative sample mining strategy
 # If warm up is less than the training period, the program will automatically switch to True after warm_up is completed
 max_violation: false
-# MildTriple Loss hyper-parameters, abandon false negatives' threshold
+# DropTriple Loss hyper-parameters, abandon false negatives' threshold
 threshold_hetero: 0.7
 threshold_homo: 0.9
 
 
 defaults:
-  - loss: mild_triplet
+  - loss: drop_triplet
   - motionencoder: transformer
   - textencoder: distilbert_linear
 

@@ -1,4 +1,4 @@
-name: mild_contrastive_loss
+name: drop_contrastive_loss
 _target_: model.losses.SoftContrastiveLoss
 
 margin: ${model.margin}

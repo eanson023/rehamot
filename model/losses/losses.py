@@ -151,7 +151,7 @@ class SoftContrastiveLoss(nn.Module):
         scores = self.sim(emb1, emb2)
 
         # Soft hard negative mining
-        # MildTrip loss function implementation
+        # DropTrip loss function implementation
         if self.max_violation:
             scores_emb1 = self.sim(emb1, emb1)
             scores_emb2 = self.sim(emb2, emb2)
