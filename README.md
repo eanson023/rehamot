@@ -5,7 +5,7 @@
 </div>
 
 ## Description
-Official PyTorch implementation of the paper [**"Cross-Modal Retrieval for Motion and Text via DropTriple Loss"**](http://???) (Under Review).
+Official PyTorch implementation of the paper [**"Cross-Modal Retrieval for Motion and Text via DropTriple Loss"**](https://arxiv.org/abs/2305.04195) (ACM Multimedia Asia (MMAsia) 2023).
 
 ![rehamot](rehamot.jpg)
 
@@ -107,6 +107,12 @@ If you want to get started with the training model quickly, you can refer to the
 ## Citation
 If you find this code to be useful for your research, please consider citing.
 ```
+@article{yan2023cross,
+  title={Cross-Modal Retrieval for Motion and Text via DropTriple Loss},
+  author={Yan, Sheng and Liu, Yang and Wang, Haoqiang and Du, Xin and Liu, Mengyuan and Liu, Hong},
+  journal={arXiv preprint arXiv:2305.04195},
+  year={2023}
+}
 ```
 
 ## Acknowledgments

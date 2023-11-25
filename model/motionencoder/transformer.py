@@ -41,7 +41,7 @@ class TransformerEncoder(nn.Module):
 
         self.learning_rates_x = []
 
-    def forward(self, features: Tensor, lengths: Optional[List[int]] = None) -> Tuple[Tensor, None]:
+    def forward(self, features: Tensor, lengths: Optional[List[int]] = None):
         if lengths is None:
             lengths = [len(feature) for feature in features]
 
