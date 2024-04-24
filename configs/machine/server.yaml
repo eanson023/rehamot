@@ -4,9 +4,9 @@ device: cuda
 
 # specific attributes to this machine
 # Size of a training mini-batch.
-batch_size: 32
+batch_size: 50
 
-num_workers: 8
+num_workers: 4
 # Number of training epochs.
 num_epochs: 60
 # Initial learning rate.
@@ -17,10 +17,10 @@ grad_clip: 0
 lr_update: 30
 
 # Number of steps to print and record the log.
-log_step: 10
+log_step: 200
 
 # Number of steps to run validation.
-val_step: 500
+val_step: 1600
 
 warm_up: ${model.warm_up}
 

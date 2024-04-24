@@ -4,8 +4,14 @@
 
 </div>
 
+## Updates
+- 2024/04/24: Added Cross-perceptual Salience Mapping, allowing for the salient
+perception of different postures or words based on different
+samples.
+- 2024/04/24: Unified the training strategies of the two datasets and updated pre-trained models
+
 ## Description
-Official PyTorch implementation of the paper [**"Cross-Modal Retrieval for Motion and Text via DropTriple Loss"**](https://arxiv.org/abs/2305.04195) (ACM Multimedia Asia (MMAsia) 2023).
+Official PyTorch implementation of paper [**"Cross-Modal Retrieval for Motion and Text via DropTriple Loss"**](https://arxiv.org/abs/2305.04195) (ACM Multimedia Asia (MMAsia) 2023) and [**"Improving Fine-grained Understanding for Retrieval in Human Motion and Text"**]() (Under Review).
 
 ![rehamot](rehamot.jpg)
 
@@ -21,7 +27,7 @@ conda activate rehamot
 
 And install the following packages:
 ```bash
-pip install torch torchvision
+pip install torch torchvision # Go to https://pytorch.org/get-started/previous-versions/ to find your suitable version
 pip install transformers
 pip install omegaconf
 pip install hydra-core
@@ -30,6 +36,8 @@ pip install einops
 pip install rich
 pip install tensorboard tensorboardX tensorboard_logger
 pip install matplotlib
+pip install tqdm
+pip install PyYAML
 ```
 
 ### Download the datasets
@@ -53,16 +61,17 @@ Download distilbert from __Hugging Face__
 cd deps/
 git lfs install
 git clone https://huggingface.co/distilbert-base-uncased
+git clone https://huggingface.co/sentence-transformers/all-mpnet-base-v2
 cd ..
 ```
 
 ## Pre-trained Models
 
 ### Download models
-Download models [here](https://drive.google.com/drive/folders/1soedk60Xx8nuGc1rTtGiVUEiZsj-NNJw?usp=sharing). Unzip and place them under checkpoint directory, which should be like:
+Download models [here](https://drive.google.com/file/d/12EH9PKnth_L6AMYYwCuB0LDnSx3zwDpR/view?usp=sharing). Unzip and place them under checkpoint directory, which should be like:
 ```bash
-./checkpoints/HumanML3D
-./checkpoints/KIT-ML/
+./checkpoints/humanml3d
+./checkpoints/kit/
 ```
 
 ### Evaluate pre-trained models
@@ -70,14 +79,14 @@ To evaluate Rehamot, you must run:
 ```bash
 python evaluate.py folder=FOLDER
 ```
-The ```FOLDER``` can be replaced with specific experiment, such as ```./checkpoints/HumanML3D/droptripleloss```
+The ```FOLDER``` can be replaced with specific experiment, such as ```./checkpoints/humanml3d/rehamot```
 
 ### View the pre-training results
 We recorded some metrics using tensorboard, which you can view by running the following command:
 ```bash
 tensorboard --logdir=FOLDER
 ```
-The ```FOLDER``` can be replaced with the main experiment, such as ```./checkpoints/HumanML3D```
+The ```FOLDER``` can be replaced with the main experiment, such as ```./checkpoints/humanml3d```
 
 ## Training new models
 
@@ -85,6 +94,10 @@ The ```FOLDER``` can be replaced with the main experiment, such as ```./checkpoi
 The command to launch a training experiment is the folowing:
 ```bash
 python train.py [OPTIONS]
+# HumanML3D dataset training
+python train.py data=human-ml-3d  machine.batch_size=50
+# KIT-ML dataset training
+python train.py data=kit-ml  machine.batch_size=25
 ```
 You can override anything in the configuration by passing arguments like `foo=value` or `foo.bar=value`. Of course, you can also modify the configuration directly in the configs folder.
 
@@ -95,8 +108,8 @@ You can override anything in the configuration by passing arguments like `foo=va
 - ``data=kit-ml``: Training Rehamot on KIT-ML
 
 #### Threshold
-- ``model.threshold_hetero=0.7``: Set the threshold for heteromorphism
-- ``model.threshold_homo=0.9``: Set the threshold for homomorphism 
+- ``model.threshold_hetero=0.75``: Set the threshold for heteromorphism
+- ``model.threshold_homo=0.75``: Set the threshold for homomorphism 
 
 #### Training
 - ``machine.device=gpu``: training with CUDA, on an automatically selected GPU (default)

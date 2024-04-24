@@ -17,11 +17,13 @@ class TransformerEncoder(nn.Module):
                  num_layers: int = 4,
                  num_heads: int = 4,
                  dropout: float = 0.1,
+                 only_return_cls_token: bool = True,
                  activation: str = "gelu",
                  **kwargs) -> None:
         super(TransformerEncoder, self).__init__()
 
         input_feats = nfeats
+        self.only_return_cls_token = only_return_cls_token
         self.skel_embedding = nn.Linear(input_feats, latent_dim)
 
         self.emb_token = nn.Parameter(torch.randn(latent_dim))
@@ -71,7 +73,13 @@ class TransformerEncoder(nn.Module):
         # add positional encoding
         xseq = self.sequence_pos_encoding(xseq)
         features = self.seqTransEncoder(xseq, src_key_padding_mask=~aug_mask)
-        # normalization in the motion embedding space
-        features = F.normalize(features[0], dim=1)
-        # normalization in the joint embedding space
-        return F.normalize(self.fc(features), dim=1), None
+        if self.only_return_cls_token:
+            # normalization in the motion embedding space
+            features = F.normalize(features[0], dim=1)
+            # normalization in the joint embedding space
+            return F.normalize(self.fc(features), dim=1), None
+        else:
+            # return none-norm sequence features
+            features = self.fc(features).permute(1,0,2)
+            features = F.normalize(features, dim=-1)
+            return features, aug_mask

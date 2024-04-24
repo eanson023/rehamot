@@ -1,6 +1,8 @@
 modelname: rehamot
 _target_: model.rehamot.Rehamot
 
+# ['cpsmapping', 'cosine']
+sim: 'cpsmapping'
 # Dimensionality of the latent embedding.
 latent_dim: 256
 # Dimensionality of the joint embedding.
@@ -26,8 +28,8 @@ margin: 0.2
 # If warm up is less than the training period, the program will automatically switch to True after warm_up is completed
 max_violation: false
 # DropTriple Loss hyper-parameters, abandon false negatives' threshold
-threshold_hetero: 0.7
-threshold_homo: 0.9
+threshold_hetero: 0.75
+threshold_homo: 0.75
 
 
 defaults:

@@ -73,5 +73,5 @@ def get_loaders(dataname, batch_size, workers, cfg: DictConfig):
     train_loader = get_loader_single(
         dataname, 'train', batch_size, workers, shuffle=True, drop_last=False, data_cfg=cfg)
     val_loader = get_loader_single(
-        dataname, 'val', batch_size, workers, shuffle=False, drop_last=False, data_cfg=cfg)
+        dataname, 'test', batch_size, workers, shuffle=False, drop_last=False, data_cfg=cfg)
     return train_loader, val_loader

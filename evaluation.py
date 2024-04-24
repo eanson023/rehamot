@@ -11,7 +11,9 @@ import numpy
 import torch
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
+from tqdm import tqdm
 
+from model.text_similarity_utils.dcg import nDCG
 from model.data.utils import get_loader_single
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
@@ -99,37 +101,31 @@ def encode_data(model, data_loader, tb_writer=None, log_step=10, logging=logger.
     end = time.time()
 
     # numpy array to keep all the embeddings
-    motion_embs = None
-    text_embs = None
+    motion_embs = []
+    text_embs = []
+    motion_masks = []
+    text_masks = []
+    ids = []
+
+    all_keyids = []
     with torch.no_grad():
         batch_size = data_loader.batch_size
         for i, batch in enumerate(data_loader):
             keyids, cap_indice, indice = batch['keyid'], batch['text_index'], batch['index']
             # make sure val logger is used
             model.logger = val_logger
+            
+            all_keyids.extend(keyids)
 
             # compute the embeddings
-            motion_emb, text_emb, motion_emb_m, text_emb_m = model.forward_emb(
-                **batch)
-
-            # initialize the numpy arrays given the size of the embeddings
-            if motion_embs is None:
-                motion_embs = numpy.zeros(
-                    (len(data_loader.dataset), motion_emb.size(1)))
-                text_embs = numpy.zeros(
-                    (len(data_loader.dataset), text_emb.size(1)))
-                ids = []
+            motion_emb, text_emb, motion_mask, text_mask = model.forward_emb(**batch)
 
             # preserve the embeddings by copying from gpu and converting to numpy
             for j, id in enumerate(keyids):
-                index = i * batch_size + j
-                motion_embs[index] = motion_emb.data.cpu().numpy().copy()[j]
-                text_embs[index] = text_emb.data.cpu().numpy().copy()[j]
                 ids.append({'keyid': id, 'text_index': cap_indice[j]})
 
             # measure accuracy and record loss
-            model.forward_loss(motion_emb, text_emb,
-                               motion_emb_m, text_emb_m, indice, is_train=False)
+            model.forward_loss(motion_emb, text_emb, motion_mask, text_mask, indice, is_train=False)
 
             # measure elapsed time
             batch_time.update(time.time() - end)
@@ -142,8 +138,54 @@ def encode_data(model, data_loader, tb_writer=None, log_step=10, logging=logger.
                         .format(
                             i + 1, len(data_loader), batch_time=batch_time,
                             e_log=str(model.logger)))
+            
+            # prune same motion_emb
+            valid_motion_indices = []
+            k = numpy.size(keyids, 0) - 1
+            # get unique motion id (reverse direction for loop)
+            start = i * batch_size
+            last_batch_final_keyid = ids[start-1]['keyid'] if start>0 else '-1'
+            while k >= 0:
+                cur_keyid = ids[start+k]['keyid']
+                if last_batch_final_keyid != cur_keyid:
+                    valid_motion_indices.append(k)
+                k = k - (ids[start+k]['text_index'] + 1)
+            valid_motion_indices.reverse()
+            motion_emb = motion_emb[valid_motion_indices]
+            if motion_mask is not None:
+                motion_mask = motion_mask[valid_motion_indices]
 
-    return motion_embs, text_embs, ids
+            motion_embs.append(motion_emb)
+            text_embs.append(text_emb)
+            motion_masks.append(motion_mask)
+            text_masks.append(text_mask)
+
+    with torch.no_grad():
+        sim_matrix_m2t = []
+        sim_matrix_t2m = []
+        for idx1, b1 in tqdm(enumerate(motion_embs)):
+            motion_mask = motion_masks[idx1]
+            motion_emb = b1
+            # visual_output_cls=visual_cls[idx1]
+            each_row_m2t = []
+            each_row_t2m=[]
+            for idx2, b2 in enumerate(text_embs):
+                text_mask = text_masks[idx2]
+                text_emb = b2
+        
+                m2t = model.get_similarity(motion_emb, text_emb, motion_mask, text_mask)
+                t2m = m2t.T
+                m2t = m2t.cpu().detach().numpy()
+                t2m = t2m.cpu().detach().numpy()
+                each_row_m2t.append(m2t)
+                each_row_t2m.append(t2m)
+            each_row_m2t = numpy.concatenate(tuple(each_row_m2t), axis=-1)
+            each_row_t2m = numpy.concatenate(tuple(each_row_t2m), axis=0)
+            sim_matrix_m2t.append(each_row_m2t)
+            sim_matrix_t2m.append(each_row_t2m)
+    sim_matrix_m2t = numpy.vstack(sim_matrix_m2t)
+    sim_matrix_t2m = numpy.hstack(sim_matrix_t2m)
+    return sim_matrix_m2t, sim_matrix_t2m, ids 
 
 
 @hydra.main(version_base=None, config_path="configs", config_name="evaluation")
@@ -165,8 +207,7 @@ def evalrank(newcfg: DictConfig) -> None:
     device = opt.device
     # device = 'cpu'
 
-    checkpoint = torch.load(
-        ckpt_path, map_location=device)
+    checkpoint = torch.load(ckpt_path, map_location=device)
 
     logger.info('Loading dataset')
     data_loader = get_loader_single(
@@ -196,29 +237,27 @@ def evalrank(newcfg: DictConfig) -> None:
     logger.info('checkpoint info: epoch:{} best_rsum:{}'.format(
         checkpoint['epoch'], checkpoint['best_rsum']))
     logger.info('Computing results...')
-    mot_embs, cap_embs, ids = encode_data(model, data_loader)
+    m2t_sims, t2m_sims, ids = encode_data(model, data_loader)
 
+    dataset = data_loader.dataset
     logger.info('Motions: %d, Captions: %d' %
-                (data_loader.dataset._num_motions, data_loader.dataset._num_texts))
-
-    r, rt = m2t(mot_embs, cap_embs, ids,
-                data_loader.dataset.texts_data, return_ranks=True)
-    ri, rti = t2m(mot_embs, cap_embs, ids,
-                  data_loader.dataset.texts_data, return_ranks=True)
-    record_log(rt[2], rti[2], output_dir)
+                (dataset._num_motions, data_loader.dataset._num_texts))
+    r = m2t(m2t_sims, ids, dataset.texts_data, dataset.dataname, dataset.split, return_ranks=False)
+    ri = t2m(t2m_sims, ids, dataset.texts_data, dataset.dataname, dataset.split, return_ranks=False)
+    # record_log(rt[2], rti[2], output_dir)
 
     ar = (r[0] + r[1] + r[2]) / 3
     ari = (ri[0] + ri[1] + ri[2]) / 3
     rsum = r[0] + r[1] + r[2] + ri[0] + ri[1] + ri[2]
     logger.info("rsum: %.1f" % rsum)
     logger.info("Average m2t Recall: %.1f" % ar)
-    logger.info("Motion to text: %.1f %.1f %.1f %.1f %.1f" % r)
+    logger.info("Motion to text: %.1f %.1f %.1f %.1f %.1f mpnet@50:%.4f rougeL@50:%.4f mpnet@100:%.4f rougeL@100:%.4f" % r)
     logger.info("Average t2m Recall: %.1f" % ari)
-    logger.info("Text to motion: %.1f %.1f %.1f %.1f %.1f" % ri)
-    torch.save({'rt': rt, 'rti': rti}, output_dir / 'ranks.pth.tar')
+    logger.info("Text to motion: %.1f %.1f %.1f %.1f %.1f mpnet@50:%.4f rougeL@50:%.4f mpnet@100:%.4f rougeL@100:%.4f" % ri)
+    # torch.save({'rt': rt, 'rti': rti}, output_dir / 'ranks.pth.tar')
 
 
-def m2t(motions, captions, ids, texts_data, return_ranks=False):
+def m2t(mt2_sims, ids, texts_data, dset_name, split, return_ranks=False):
     """
     Motions->Text (Motion Annotation)
 
@@ -230,6 +269,11 @@ def m2t(motions, captions, ids, texts_data, return_ranks=False):
     """
     npts = len(texts_data)
     index_list = []
+    relevance_methods = ['mpnet', 'rougeL']
+    ndcgs50_scorer = nDCG(dset_name, npts, split, type='m2t', rank=50, relevance_methods=relevance_methods)
+    ndcgs50 = {m: numpy.zeros(npts) for m in relevance_methods}
+    ndcgs100_scorer = nDCG(dset_name, npts, split, type='m2t', rank=100, relevance_methods=relevance_methods)
+    ndcgs100 = {m: numpy.zeros(npts) for m in relevance_methods}
 
     ranks = numpy.zeros(npts)
     top1 = numpy.zeros(npts)
@@ -237,16 +281,14 @@ def m2t(motions, captions, ids, texts_data, return_ranks=False):
     ranks_info = []
     index = 0
     eit = 0
-    while index < len(ids):
-        keyid = ids[index]['keyid']
+    cur_correct_start_idx = 0
+    while index < len(mt2_sims):
+        keyid = ids[cur_correct_start_idx]['keyid']
         texts = texts_data[keyid]
         step = len(texts)
 
-        # Get query motion
-        m = motions[index].reshape(1, motions.shape[1])
-
         # Compute scores
-        d = numpy.dot(m, captions.T).flatten()
+        d = mt2_sims[index]
         # inds: The index of the stored score from high to low (i.e. the index of the value of d in descending order)
         inds = numpy.argsort(d)[::-1]
         index_list.append(inds[0])
@@ -254,12 +296,29 @@ def m2t(motions, captions, ids, texts_data, return_ranks=False):
         # Score
         rank = 1e20
         rank_index = 0
+        # ndcg10 = {m: 0 for m in relevance_methods}
+        # ndcg100 = {m: 0 for m in relevance_methods}
         # Return the highest index (ranking) in the n sentences (ground-truth) corresponding to the picture after sorting
-        for i in range(index, index + step, 1):
+        for i in range(cur_correct_start_idx, cur_correct_start_idx + step, 1):
             tmp = numpy.where(inds == i)[0][0]
             if tmp < rank:
                 rank = tmp
                 rank_index = i
+            # for m in relevance_methods:
+            #     if tmp_ndcg10_output[0][m] > ndcg10[m]:
+            #         ndcg10[m] = tmp_ndcg10_output[0][m]
+            #         ndcgs50[m][index] = tmp_ndcg10_output[0][m]
+            #     if tmp_ndcg100_output[0][m] > ndcg100[m]:
+            #         ndcg100[m] = tmp_ndcg100_output[0][m]
+            #         ndcgs100[m][index] = tmp_ndcg100_output[0][m]
+        
+        # compute and store ndcg
+        ndcgs10_output = ndcgs50_scorer.compute_ndcg(index, inds.astype(int))
+        ndcgs100_output = ndcgs100_scorer.compute_ndcg(index, inds.astype(int))
+        for m in relevance_methods:
+            ndcgs50[m][index] = ndcgs10_output[0][m]
+            ndcgs100[m][index] = ndcgs100_output[0][m]
+ 
         # The minimum ranking of the most relevant positive samples of the eit graph
         ranks[eit] = rank
         # The most relevant sentence index for the image eit
@@ -280,7 +339,8 @@ def m2t(motions, captions, ids, texts_data, return_ranks=False):
             ranks_info.append(rank_info)
         # ###############################################################################
 
-        index += step
+        index += 1
+        cur_correct_start_idx += step
         eit += 1
 
     # Compute metrics
@@ -289,13 +349,18 @@ def m2t(motions, captions, ids, texts_data, return_ranks=False):
     r10 = 100.0 * len(numpy.where(ranks < 10)[0]) / len(ranks)
     medr = numpy.floor(numpy.median(ranks)) + 1
     meanr = ranks.mean() + 1
+    # ndcg_r10_mean = {k: n.mean() for k, n in ndcgs_r10.items()}
+    ndcgs10_mean_mpnet = ndcgs50['mpnet'].mean()
+    ndcgs10_mean_rougeL = ndcgs50['rougeL'].mean()
+    ndcgs100_mean_mpnet = ndcgs100['mpnet'].mean()
+    ndcgs100_mean_rougeL = ndcgs100['rougeL'].mean()
     if return_ranks:
-        return (r1, r5, r10, medr, meanr), (ranks, top1, ranks_info)
+        return (r1, r5, r10, medr, meanr, ndcgs10_mean_mpnet, ndcgs10_mean_rougeL, ndcgs100_mean_mpnet, ndcgs100_mean_rougeL), (ranks, top1, ranks_info)
     else:
-        return (r1, r5, r10, medr, meanr)
+        return (r1, r5, r10, medr, meanr, ndcgs10_mean_mpnet, ndcgs10_mean_rougeL, ndcgs100_mean_mpnet, ndcgs100_mean_rougeL)
 
 
-def t2m(motions, captions, ids, texts_data, return_ranks=False):
+def t2m(t2m_sims, ids, texts_data, dset_name, split, return_ranks=False):
     """
     Text->Motions (Motion Search)
 
@@ -306,30 +371,36 @@ def t2m(motions, captions, ids, texts_data, return_ranks=False):
         texts_data: text description of all ids
     """
     motions_indice = []
-    i = numpy.size(captions, 0) - 1
+    i = numpy.size(t2m_sims, 0) - 1
     while i >= 0:
         motions_indice.append(i)
         i = i - (ids[i]['text_index'] + 1)
     motions_indice.reverse()
-    ims = motions[motions_indice]
 
-    ranks = numpy.zeros(numpy.size(captions, 0))
-    top1 = numpy.zeros(numpy.size(captions, 0))
+    npts = len(ids)
+
+    relevance_methods = ['mpnet', 'rougeL']
+    ndcgs50_scorer = nDCG(dset_name, npts, split, type='t2m', rank=10, relevance_methods=relevance_methods)
+    ndcgs50 = {m: numpy.zeros(npts) for m in relevance_methods}
+    ndcgs100_scorer = nDCG(dset_name, npts, split, type='t2m', rank=100, relevance_methods=relevance_methods)
+    ndcgs100 = {m: numpy.zeros(npts) for m in relevance_methods}
+
+    ranks = numpy.zeros(numpy.size(t2m_sims, 0))
+    top1 = numpy.zeros(numpy.size(t2m_sims, 0))
 
     ranks_info = []
+    # aka query id
     index = 0
     # traverse the index of the key
+    # aka motion id
     eit = 0
-    while index < len(ids):
+    while index < npts:
         keyid = ids[index]['keyid']
         texts = texts_data[keyid]
         step = len(texts)
 
-        # Get query captions
-        queries = captions[index: index + step]
-
         # Compute scores
-        d = numpy.dot(queries, ims.T)
+        d = t2m_sims[index: index + step]
         inds = numpy.zeros(d.shape)
         for i in range(len(inds)):
             # inds: The index of the score of the i-th sentence under index from high to low (i.e. the index of the value of d in descending order)
@@ -337,6 +408,13 @@ def t2m(motions, captions, ids, texts_data, return_ranks=False):
             # Find the ranking of ground-truth and record it in the overall ranks
             ranks[index + i] = numpy.where(inds[i] == eit)[0][0]
             rank = ranks[index + i].astype(int)
+
+            # compute and store ndcg
+            ndcgs10_output = ndcgs50_scorer.compute_ndcg(index, inds[i].astype(int))
+            ndcgs100_output = ndcgs100_scorer.compute_ndcg(index, inds[i].astype(int))
+            for m in relevance_methods:
+                ndcgs50[m][index] = ndcgs10_output[0][m]
+                ndcgs100[m][index] = ndcgs100_output[0][m]
 
             # #########################################################################
             if return_ranks:
@@ -357,9 +435,9 @@ def t2m(motions, captions, ids, texts_data, return_ranks=False):
             # ############################################################################
 
             top1[index + i] = inds[i][0]
-
-        index += step
+        
         eit += 1
+        index += step
 
     # Compute metrics
     r1 = 100.0 * len(numpy.where(ranks < 1)[0]) / len(ranks)
@@ -367,10 +445,14 @@ def t2m(motions, captions, ids, texts_data, return_ranks=False):
     r10 = 100.0 * len(numpy.where(ranks < 10)[0]) / len(ranks)
     medr = numpy.floor(numpy.median(ranks)) + 1
     meanr = ranks.mean() + 1
+    ndcgs10_mean_mpnet = ndcgs50['mpnet'].mean()
+    ndcgs10_mean_rougeL = ndcgs50['rougeL'].mean()
+    ndcgs100_mean_mpnet = ndcgs100['mpnet'].mean()
+    ndcgs100_mean_rougeL = ndcgs100['rougeL'].mean()
     if return_ranks:
-        return (r1, r5, r10, medr, meanr), (ranks, top1, ranks_info)
+        return (r1, r5, r10, medr, meanr, ndcgs10_mean_mpnet, ndcgs10_mean_rougeL, ndcgs100_mean_mpnet, ndcgs100_mean_rougeL), (ranks, top1, ranks_info)
     else:
-        return (r1, r5, r10, medr, meanr)
+        return (r1, r5, r10, medr, meanr, ndcgs10_mean_mpnet, ndcgs10_mean_rougeL, ndcgs100_mean_mpnet, ndcgs100_mean_rougeL)
 
 
 def record_log(r_m2t, r_t2m, path):

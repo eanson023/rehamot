@@ -1,0 +1,6 @@
+datasets/
+outputs/humanml3d
+outputs/kit
+checkpoints/
+.vscode
+__pycache__

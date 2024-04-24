@@ -1,0 +1,5 @@
+name: sentence_encoder
+_target_: model.textencoder.sent_enc.SentenceEncoder
+
+modelpath: ${path.deps}/all-mpnet-base-v2
+device: cuda

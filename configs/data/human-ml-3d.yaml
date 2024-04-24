@@ -1,13 +1,9 @@
-dataname: human-ml-3d
+dataname: humanml3d
 _target_: model.data.humanml3d.HumanML3D
 
 # Paths
 datapath: ${path.datasets}/HumanML3D
 splitpath: ${path.datasets}/humanml3d-splits
-
-# Machine
-batch_size: ${machine.batch_size}
-num_workers: ${machine.num_workers}
 
 # Motion
 framerate: 20

@@ -16,6 +16,7 @@ class HumanML3D(Dataset):
 
     def __init__(self, datapath: str,
                  splitpath: str,
+                 dataname: str,
                  split: str = "train",
                  min_motion_len: int = 24,
                  progress_bar: bool = True,
@@ -24,8 +25,11 @@ class HumanML3D(Dataset):
                  max_duration: int = 400,
                  data_augment: bool = False,
                  tiny: bool = False, **kwargs):
+        self.dataname = dataname
         self.split = split
         self.ids = []
+        # only for training
+        data_augment = data_augment and self.split == "train"
 
         super().__init__()
         keyids = get_split_keyids(path=splitpath, split=split + '.txt')

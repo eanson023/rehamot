@@ -9,7 +9,7 @@ from torch.nn.utils.clip_grad import clip_grad_norm_
 matplotlib.use('Agg')  # NOQA
 from matplotlib import pyplot as plt
 
-from model.losses import cosine_sim as sim
+from model.losses import cosine_sim, cross_perceptual_salience_mapping
 
 
 class Rehamot(object):
@@ -21,6 +21,7 @@ class Rehamot(object):
                  textencoder: DictConfig,
                  motionencoder: DictConfig,
                  loss: DictConfig,
+                 sim: str,
                  nfeats: int,
                  learning_rate: float,
                  grad_clip: float,
@@ -31,10 +32,18 @@ class Rehamot(object):
         self.grad_clip = grad_clip
         self.device = device
         self.enable_momentum = enable_momentum
+        if sim == "cpsmapping":
+            self.sim = cross_perceptual_salience_mapping
+            only_return_cls_token = False
+        elif sim == "cosine":
+            self.sim = cosine_sim
+            only_return_cls_token = True
+        else:
+            raise NotImplementedError()
         # Build Models
         self.motionencoder = instantiate(
-            motionencoder, nfeats=nfeats).to(device)
-        self.textencoder = instantiate(textencoder).to(device)
+            motionencoder, nfeats=nfeats, only_return_cls_token=only_return_cls_token).to(device)
+        self.textencoder = instantiate(textencoder, only_return_cls_token=only_return_cls_token).to(device)
         if torch.cuda.is_available():
             torch.backends.cudnn.enabled = True
         num_params = sum(p.numel() for p in self.motionencoder.parameters() if p.requires_grad)
@@ -43,7 +52,7 @@ class Rehamot(object):
         print(f"Number of parameters in Rehamot's textencoder: {num_params}")
 
         # Loss and Optimizer
-        self.criterion = instantiate(loss).to(device)
+        self.criterion = instantiate(loss, sim=self.sim).to(device)
 
         params = []
         # Fine-tuning with different learning rates for parts of the neural network
@@ -94,25 +103,18 @@ class Rehamot(object):
         """Compute the motion and text embeddings
         """
         motion = motion.to(self.device)
-        motion_emb, motion_emb_m = self.motionencoder(motion, length)
-        text_emb, text_emb_m = self.textencoder(text)
-        del motion, text
-        return motion_emb, text_emb, motion_emb_m, text_emb_m
+        motion_emb, motion_mask = self.motionencoder(motion, length)
+        text_emb, text_mask = self.textencoder(text)
+        return motion_emb, text_emb, motion_mask, text_mask
 
-    def forward_loss(self, motion_emb, text_emb, motion_emb_m=None, text_emb_m=None, idx=None, is_train=True):
+    def forward_loss(self, motion_emb, text_emb, motion_mask=None, text_mask=None, idx=None, is_train=True):
         """Compute the loss given pairs of motion and text embeddings
         """
         n = motion_emb[0].size(0)
-        if not self.enable_momentum or not is_train:
-            loss = self.criterion(motion_emb, text_emb)
-            self.logger.update('Le', loss.item(), n)
-            return loss
-        else:
-            # MoCo
-            loss_m2t = self.criterion(motion_emb, text_emb_m, idx)
-            loss_t2m = self.criterion(text_emb, motion_emb_m, idx)
-            self.logger.update('Le_m', loss_m2t.item() + loss_t2m.item(), n)
-            return loss_m2t + loss_t2m
+        loss, drop_num = self.criterion(motion_emb, text_emb, motion_mask, text_mask)
+        self.logger.update('Le', loss.item(), n)
+        self.logger.update('Drop_num', drop_num, n)
+        return loss
 
     def train_emb(self, motion, text, length, index, **kwargs):
         """One training step given motions and texts.
@@ -122,33 +124,34 @@ class Rehamot(object):
         self.logger.update('lr', self.optimizer.param_groups[0]['lr'])
 
         # compute the embeddings
-        motion_emb, text_emb, motion_emb_m, text_emb_m = self.forward_emb(
-            motion, text, length)
+        motion_emb, text_emb, motion_mask, text_mask = self.forward_emb(motion, text, length)
 
         # measure similarity in a mini-batch
         if self.Eiters % kwargs['val_step'] == 0 or kwargs['init']:
-            self.log_similarity(motion_emb, text_emb)
+            self.log_similarity(motion_emb, text_emb, motion_mask, text_mask)
 
         # measure accuracy and record loss
         self.optimizer.zero_grad()
-        loss = self.forward_loss(
-            motion_emb, text_emb, motion_emb_m, text_emb_m, index)
+        loss = self.forward_loss(motion_emb, text_emb, motion_mask, text_mask, index)
 
         # compute gradient and do SGD step
         loss.backward()
         if self.grad_clip > 0:
             clip_grad_norm_(self.params, self.grad_clip)
         self.optimizer.step()
+    
+    def get_similarity(self, motion_emb, text_emb, motion_mask=None, text_mask=None):
+        return self.sim(motion_emb, text_emb, motion_mask, text_mask)
 
-    def log_similarity(self, motion_emb, text_emb):
+    def log_similarity(self, motion_emb, text_emb, motion_mask, text_mask):
         """Measure similarity in a mini-batch.
         """
         # compute similarity matrix
         # the key is connect with LogCollector
         similarity_matrices = {
-            'sim_matrix_inter': sim(motion_emb, text_emb).detach().cpu().numpy(),
-            'sim_matrix_m': sim(motion_emb, motion_emb).detach().cpu().numpy(),
-            'sim_matrix_t': sim(text_emb, text_emb).detach().cpu().numpy()
+            'sim_matrix_inter': self.sim(motion_emb, text_emb, motion_mask, text_mask).detach().cpu().numpy(),
+            'sim_matrix_m': self.sim(motion_emb, motion_emb, motion_mask, motion_mask).detach().cpu().numpy(),
+            'sim_matrix_t': self.sim(text_emb, text_emb, text_mask, text_mask).detach().cpu().numpy()
         }
         # add similarity matrix and mean similarity to tensorboard
         for name, similarity_matrix in similarity_matrices.items():

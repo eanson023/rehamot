@@ -1,0 +1,26 @@
+hydra:
+  run:
+    dir: outputs/computed_relevances
+  output_subdir: null
+
+seed: 1234
+
+logger_level: INFO
+
+split: test
+
+# ['mpnet', 'rougeL']
+method: rougeL
+# ['t2m', 'm2t']
+type: m2t
+ncpus: 1
+
+# Composing nested config with default
+defaults:
+  - data: kit-ml
+  - /model/textencoder/sent_enc@sent_model
+  - /path@path
+  - _self_
+
+model:
+  data_augment: false

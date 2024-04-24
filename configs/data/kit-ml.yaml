@@ -1,13 +1,9 @@
-dataname: kit-ml
+dataname: kit
 _target_: model.data.kitml.KITML
 
 # Paths
 datapath: ${path.datasets}/KIT-ML
 splitpath: ${path.datasets}/kitml-splits
-
-# Machine
-batch_size: ${machine.batch_size}
-num_workers: ${machine.num_workers}
 
 # Motion
 framerate: 12.5

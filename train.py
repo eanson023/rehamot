@@ -22,7 +22,7 @@ import random
 import model.launch.prepare  # NOQA
 from evaluation import AverageMeter, LogCollector, encode_data, m2t, t2m
 from model.data.utils import get_loaders
-
+# torch.autograd.set_detect_anomaly(True)
 logger = logging.getLogger(__name__)
 
 
@@ -62,8 +62,8 @@ def main(cfg: DictConfig) -> None:
                         nfeats=train_loader.dataset.nfeats,
                         # Avoid recursive early loading of encoders
                         _recursive_=False)
-    logger.info(model.motionencoder)
-    logger.info(model.textencoder)
+    # logger.info(model.motionencoder)
+    # logger.info(model.textencoder)
     logger.info(f"Model '{cfg.model.modelname}' loaded")
 
     ##############################################################################################
@@ -174,28 +174,29 @@ def train(opt, train_loader, model, epoch, val_loader):
         model.logger.tb_log(global_step=model.Eiters)
 
         # validate at every val_step
-        if model.Eiters % opt.val_step == 0:
-            validate(opt, val_loader, model)
+        # if model.Eiters % opt.val_step == 0:
+        #     validate(opt, val_loader, model)
 
         start_new_epoch = False
 
 
 def validate(opt, val_loader, model):
     # compute the encoding for all the validation images and captions
-    motion_embs, cap_embs, ids = encode_data(
-        model, val_loader, tb_writer, opt.log_step, logging.info)
+    mt2_sims, t2m_sims, ids = encode_data(model, val_loader, tb_writer, opt.log_step, logging.info)
+    
+    dataset = val_loader.dataset
 
     # motion retrieval
-    (r1, r5, r10, medr, meanr) = m2t(
-        motion_embs, cap_embs, ids, val_loader.dataset.texts_data)
+    (r1, r5, r10, medr, meanr, ndcgs10_mean_mpnet, ndcgs10_mean_rougeL, ndcgs100_mean_mpnet, ndcgs100_mean_rougeL) = m2t(
+        mt2_sims, ids, dataset.texts_data, dataset.dataname, dataset.split)
     # image retrieval
-    (r1i, r5i, r10i, medri, meanri) = t2m(
-        motion_embs, cap_embs, ids, val_loader.dataset.texts_data)
+    (r1i, r5i, r10i, medri, meanri, ndcgs10_mean_mpneti, ndcgs10_mean_rougeLi, ndcgs100_mean_mpneti, ndcgs100_mean_rougeLi) = t2m(
+        t2m_sims, ids, dataset.texts_data, dataset.dataname, dataset.split)
 
-    logging.info("Motion to text: %.1f, %.1f, %.1f, %.1f, %.1f" %
-                 (r1, r5, r10, medr, meanr))
-    logging.info("Text to motion: %.1f, %.1f, %.1f, %.1f, %.1f" %
-                 (r1i, r5i, r10i, medri, meanri))
+    logging.info("Motion to text: %.1f, %.1f, %.1f, %.1f, %.1f, %.4f, %.4f, %.4f, %.4f" %
+                 (r1, r5, r10, medr, meanr, ndcgs10_mean_mpnet, ndcgs10_mean_rougeL, ndcgs100_mean_mpnet, ndcgs100_mean_rougeL))
+    logging.info("Text to motion: %.1f, %.1f, %.1f, %.1f, %.1f, %.4f, %.4f, %.4f, %.4f" %
+                 (r1i, r5i, r10i, medri, meanri, ndcgs10_mean_mpneti, ndcgs10_mean_rougeLi, ndcgs100_mean_mpneti, ndcgs100_mean_rougeLi))
     # sum of recalls to be used for early stopping
     currscore = r1 + r5 + r10 + r1i + r5i + r10i
     logging.info("Currscore: %.1f" % currscore)

@@ -2,4 +2,5 @@ name: info_NCE_loss
 _target_: model.losses.InfoNCELoss
 
 temp: ${model.temp}
-queue_size: ${model.queue_size}
+threshold_homo: ${model.threshold_homo}
+threshold_hetero: ${model.threshold_hetero}

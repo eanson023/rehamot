@@ -17,6 +17,7 @@ class KITML(Dataset):
 
     def __init__(self, datapath: str,
                  splitpath: str,
+                 dataname: str,
                  split: str = "train",
                  max_duration: int = 400,
                  progress_bar: bool = True,
@@ -24,8 +25,12 @@ class KITML(Dataset):
                  downsample: bool = True,
                  data_augment: bool = False,
                  **kwargs):
+        self.dataname = dataname
         self.split = split
         self.ids = []
+
+        # only for training
+        data_augment = data_augment and self.split == "train"
 
         super().__init__()
         keyids = get_split_keyids(path=splitpath, split=split + '.txt')
