@@ -4,14 +4,9 @@
 
 </div>
 
-## Updates
-- 2024/04/24: Added Cross-perceptual Salience Mapping, allowing for the salient
-perception of different postures or words based on different
-samples.
-- 2024/04/24: Unified the training strategies of the two datasets and updated pre-trained models
 
 ## Description
-Official PyTorch implementation of paper [**"Cross-Modal Retrieval for Motion and Text via DropTriple Loss"**](https://arxiv.org/abs/2305.04195) (ACM Multimedia Asia (MMAsia) 2023) and [**"Improving Fine-grained Understanding for Retrieval in Human Motion and Text"**]() (Under Review).
+Official PyTorch implementation of paper [**"Cross-Modal Retrieval for Motion and Text via DropTriple Loss"**](https://arxiv.org/abs/2305.04195) (ACM Multimedia Asia (MMAsia) 2023 Best Paper Candidate) and [**"Improving Fine-grained Understanding for Retrieval in Human Motion and Text"**](https://doi.org/10.1109/LSP.2024.3425283) (IEEE SPL 2024).
 
 ![rehamot](rehamot.jpg)
 
