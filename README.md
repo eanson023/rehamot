@@ -4,6 +4,9 @@
 
 </div>
 
+## Updates
+
+- 2024/04/24: Unified the training strategy for two datasets and updated the pretraining model according to the latest paper (IEEE SPL 2024).
 
 ## Description
 Official PyTorch implementation of paper [**"Cross-Modal Retrieval for Motion and Text via DropTriple Loss"**](https://arxiv.org/abs/2305.04195) (ACM Multimedia Asia (MMAsia) 2023 Best Paper Candidate) and [**"Improving Fine-grained Understanding for Retrieval in Human Motion and Text"**](https://doi.org/10.1109/LSP.2024.3425283) (IEEE SPL 2024).
